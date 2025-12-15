@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 from data_provider.m4 import M4Dataset, M4Meta
 from data_provider.uea import subsample, interpolate_missing, Normalizer
-from sktime.datasets import load_from_tsfile_to_dataframe
+# from sktime.datasets import load_from_tsfile_to_dataframe
 import warnings
 from utils.augmentation import run_augmentation_single
 
@@ -684,6 +684,16 @@ class UEAloader(Dataset):
         return all_df, labels_df
 
     def load_single(self, filepath):
+        try:
+            from sktime.datasets import load_from_tsfile_to_dataframe
+        except ImportError as e:
+            raise ImportError(
+                "UEAloader requires `sktime` (for load_from_tsfile_to_dataframe). "
+                "You removed sktime to keep the main TimeVLM env compatible. "
+                "If you want to run UEA datasets, install sktime (and compatible scikit-learn) "
+                "in a separate env, or temporarily install sktime in this env."
+            ) from e
+
         df, labels = load_from_tsfile_to_dataframe(filepath, return_separate_X_and_y=True,
                                                              replace_missing_vals_with='NaN')
         labels = pd.Series(labels, dtype="category")
