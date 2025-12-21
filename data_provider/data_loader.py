@@ -70,6 +70,8 @@ class Dataset_ETT_hour(Dataset):
             data = df_data.values
 
         df_stamp = df_raw[['date']][border1:border2]
+        self.raw_dates = pd.to_datetime(df_raw['date'][border1:border2]).reset_index(drop=True) # for chronos2
+        
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
         if self.timeenc == 0:
             df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)
@@ -163,6 +165,8 @@ class Dataset_ETT_minute(Dataset):
             data = df_data.values
 
         df_stamp = df_raw[['date']][border1:border2]
+        self.raw_dates = pd.to_datetime(df_raw['date'][border1:border2]).reset_index(drop=True) # for chronos2
+
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
         if self.timeenc == 0:
             df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)

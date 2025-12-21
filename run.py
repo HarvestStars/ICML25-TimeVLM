@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch
+from exp.exp_chronos2_long_term_forecast import Exp_Chronos2_Forecast
 from exp.exp_few_shot_forecasting import Exp_Few_Shot_Forecast
 from exp.exp_long_term_forecasting import Exp_Long_Term_Forecast
 from exp.exp_zero_shot_forecasting import Exp_Zero_Shot_Forecast
@@ -169,6 +170,30 @@ if __name__ == '__main__':
     # few-shot forecasting
     parser.add_argument('--percent', type=float, default=1, help='proportion of in-distribution downstream dataset')
 
+    # ===== Chronos2 specific =====
+    parser.add_argument(
+        '--chronos2_model',
+        type=str,
+        default='amazon/chronos-2',  # HuggingFace model name or local path
+        help='HuggingFace model name or local path for Chronos2Pipeline.from_pretrained'
+    )
+    parser.add_argument(
+        '--chronos2_dtype',
+        type=str,
+        default='bfloat16',   # or fp16/fp32
+        help='dtype for Chronos2 model weights: fp16/bf16/fp32'
+    )
+
+    # (optional) training knobs for pipeline.fit
+    parser.add_argument('--chronos2_num_steps', type=int, default=1000)
+    parser.add_argument('--chronos2_batch_size', type=int, default=256)
+    parser.add_argument('--chronos2_learning_rate', type=float, default=1e-6)
+    parser.add_argument('--chronos2_finetune_mode', type=str, default='full')
+    parser.add_argument('--chronos2_logging_steps', type=int, default=50)
+
+    # (optional) eval knobs
+    parser.add_argument('--chronos2_eval_batch_size', type=int, default=32)
+
     args = parser.parse_args()
     args.use_gpu = True if torch.cuda.is_available() else False
 
@@ -184,7 +209,9 @@ if __name__ == '__main__':
     # print arguments
     print_args(args)
 
-    if args.task_name == 'long_term_forecast':
+    if args.task_name == 'chronos2_long_term_forecast':
+        Exp = Exp_Chronos2_Forecast
+    elif args.task_name == 'long_term_forecast':
         Exp = Exp_Long_Term_Forecast
     elif args.task_name == 'short_term_forecast':
         Exp = Exp_Short_Term_Forecast
@@ -199,7 +226,7 @@ if __name__ == '__main__':
     elif args.task_name == 'few_shot_forecast':
         Exp = Exp_Few_Shot_Forecast
     else:
-        Exp = Exp_Long_Term_Forecast
+        raise ValueError(f"Unknown task_name: {args.task_name}")
 
     if args.is_training:
         for ii in range(args.itr):
