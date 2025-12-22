@@ -303,6 +303,7 @@ class Exp_Chronos2_Forecast(Exp_Basic):
                     true_batch[j] = fut
 
                 ctx_inputs = torch.from_numpy(ctx_batch)  # (B(number of tasks!), C, seq_len)
+                ctx_vis = np.transpose(ctx_batch, (0, 2, 1)).copy()  # (B, seq_len, C)
 
                 # ===== predict median (q=0.5) =====
                 # mean: list[tensor], each tensor corresponds to one input series in the batch
@@ -314,9 +315,6 @@ class Exp_Chronos2_Forecast(Exp_Basic):
                     # batch_size=B*C,              # total TS number for each Chronos2 predict batch, could be B*C here, but default is 256.
                     context_length=seq_len,
                 )
-
-                # f_dim align
-                f_dim = -1 if getattr(self.args, "features", "") == "MS" else 0
 
                 # mean is list length B; each element shape often (C, pred_len)
                 pred_batch = np.empty((B, pred_len, C), dtype=np.float32)

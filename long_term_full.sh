@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-#SBATCH -p gpu_h100
+#SBATCH -p gpu_a100
 #SBATCH --gpus=1
-#SBATCH --cpus-per-task=18
-#SBATCH --mem=120G
+#SBATCH --cpus-per-gpu=8
+#SBATCH --mem-per-gpu=64G
 #SBATCH -t 03:00:00
 #SBATCH -J TimeVLM_Traffic
 #SBATCH -D /projects/prjs1859/ICML25-TimeVLM
