@@ -62,6 +62,27 @@ def data_provider(args, flag):
             collate_fn=lambda x: collate_fn(x, max_len=args.seq_len)
         )
         return data_set, data_loader
+    elif args.task_name == 'chronos2_long_term_forecast':
+        # we need dataset has the "data_x" attribute for chronos2
+        data_set = Data(
+            args = args,
+            root_path=args.root_path,
+            data_path=args.data_path,
+            flag=flag,
+            size=[args.seq_len, args.label_len, args.pred_len],
+            features=args.features,
+            target=args.target,
+            timeenc=timeenc,
+            freq=freq,
+            seasonal_patterns=args.seasonal_patterns
+        )
+        if args.percent < 1. and flag == 'train':
+            num_samples = int(len(data_set) * args.percent)
+            indices = torch.randperm(len(data_set))[:num_samples]
+            data_set = torch.utils.data.Subset(data_set, indices)
+            print(f"Few-shot sampling: {args.percent*100}% of data, {len(data_set)} samples")
+        print(flag, len(data_set))
+        return data_set, None # only use the data set, no data loader needed in chronos2
     else:
         if args.data == 'm4':
             drop_last = False

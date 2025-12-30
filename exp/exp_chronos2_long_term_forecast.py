@@ -67,8 +67,8 @@ class Exp_Chronos2_Forecast(Exp_Basic):
         return pipeline
 
     def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
-        return data_set, data_loader
+        data_set, _ = data_provider(self.args, flag)
+        return data_set, None
 
     # -------------------------- Helpers --------------------------
 
