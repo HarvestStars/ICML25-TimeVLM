@@ -40,7 +40,8 @@ run_experiment() {
 
     python -u run.py \
       --task_name $task_name \
-      --is_training 1 \
+      --is_training 0 \
+      --is_zeroshot 1 \
       --root_path ./dataset/ \
       --data_path ${dset}.csv \
       --model_id ${dset}_${seq_len}_${pred_len} \
@@ -78,11 +79,11 @@ run_experiment() {
       --chronos2_dtype "bf16" 
 }
 
-# # ETTh1, n_vars=7, periodicity=24
-# run_experiment ETTh1 ETTh1 7 96 32 False 24 0.1
-# run_experiment ETTh1 ETTh1 7 192 32 False 24 0.1
-# run_experiment ETTh1 ETTh1 7 336 64 True 24 0.1
-# run_experiment ETTh1 ETTh1 7 720 256 True 24 0.3
+# ETTh1, n_vars=7, periodicity=24
+run_experiment ETTh1 ETTh1 7 96 32 False 24 0.1
+run_experiment ETTh1 ETTh1 7 192 32 False 24 0.1
+run_experiment ETTh1 ETTh1 7 336 64 True 24 0.1
+run_experiment ETTh1 ETTh1 7 720 256 True 24 0.3
 
 # # ETTh2, n_vars=7, periodicity=24
 # run_experiment ETTh2 ETTh2 7 96 64 False 24 0.2
@@ -112,7 +113,7 @@ run_experiment() {
 # run_experiment Traffic custom 862 96 128 True 24 0.1
 # run_experiment Traffic custom 862 192 128 True 24 0.1
 # run_experiment Traffic custom 862 336 256 True 24 0.1
-run_experiment Traffic custom 862 720 512 True 24 0.1
+# run_experiment Traffic custom 862 720 512 True 24 0.1
 
 # Weather, n_vars=21, periodicity=144
 # run_experiment Weather custom 21 96 64 True 144 0.1

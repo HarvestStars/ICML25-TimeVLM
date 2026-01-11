@@ -34,7 +34,8 @@ if __name__ == '__main__':
 
     # basic config
     parser.add_argument('--task_name', type=str, required=True, default='long_term_forecast', help='task name, options:[long_term_forecast, short_term_forecast, imputation, classification, anomaly_detection, zero_shot_forecast, few_shot_forecast]')
-    parser.add_argument('--is_training', type=int, required=True, default=1, help='status')
+    parser.add_argument('--is_training', type=int, required=True, default=0, help='status')
+    parser.add_argument('--is_zeroshot', type=int, required=True, default=0,help='zero-shot testing')
     parser.add_argument('--model_id', type=str, required=True, default='test', help='model id')
     parser.add_argument('--model', type=str, required=True, default='Autoformer', help='model name, options: [Autoformer, Transformer, TimesNet]')
 
@@ -231,7 +232,7 @@ if __name__ == '__main__':
     if args.is_training:
         for ii in range(args.itr):
             exp = Exp(args)
-            setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_fs{}_{}'.format(
+            setting = 'FineTune_{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_fs{}_{}'.format(
                 args.task_name,
                 args.vlm_type,
                 args.model_id,
@@ -251,10 +252,31 @@ if __name__ == '__main__':
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             exp.test(setting)
             torch.cuda.empty_cache()
+    elif args.is_zeroshot:
+        ii = 0
+        exp = Exp(args)
+        setting = 'ZeroShot_{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_fs{}_{}'.format(
+            args.task_name,
+            args.vlm_type,
+            args.model_id,
+            args.model,
+            args.data,
+            args.features,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.d_model,
+            args.percent,
+            ii)
+
+        print('>>>>>>>Zeroshot : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+        exp.test(setting, test=0)
+        
+        torch.cuda.empty_cache()
     else:
         ii = 0
         exp = Exp(args)
-        setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_fs{}_{}'.format(
+        setting = 'Test_{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_fs{}_{}'.format(
             args.task_name,
             args.vlm_type,
             args.model_id,

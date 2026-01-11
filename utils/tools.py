@@ -156,7 +156,8 @@ def visualize_embeddings_difference(patch_features, fused_features, save_path='e
             
 
 # Set global font to Times New Roman
-plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif', 'STIXGeneral']
 plt.rcParams['font.size'] = 14  # Set global font size
 
 def visualize_embeddings(patch_features, fused_features, save_path='embedding_distribution.png'):

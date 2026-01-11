@@ -272,6 +272,8 @@ class Dataset_Custom(Dataset):
             data = df_data.values
 
         df_stamp = df_raw[['date']][border1:border2]
+        self.raw_dates = pd.to_datetime(df_raw['date'][border1:border2]).reset_index(drop=True) # for chronos2
+
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
         if self.timeenc == 0:
             df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)
@@ -391,23 +393,28 @@ class Dataset_M4(Dataset):
 
 
 class PSMSegLoader(Dataset):
-    def __init__(self, args, root_path, win_size, step=1, flag="train"):
+    def __init__(self, args, root_path, data_path, size, win_size, step=1, flag="train"):
         self.flag = flag
         self.step = step
         self.win_size = win_size
         self.scaler = StandardScaler()
+
+        # ---- load + scale (unchanged) ----
         data = pd.read_csv(os.path.join(root_path, 'train.csv'))
         data = data.values[:, 1:]
         data = np.nan_to_num(data)
         self.scaler.fit(data)
         data = self.scaler.transform(data)
+
         test_data = pd.read_csv(os.path.join(root_path, 'test.csv'))
         test_data = test_data.values[:, 1:]
         test_data = np.nan_to_num(test_data)
         self.test = self.scaler.transform(test_data)
+
         self.train = data
         data_len = len(self.train)
         self.val = self.train[(int)(data_len * 0.8):]
+        
         self.test_labels = pd.read_csv(os.path.join(root_path, 'test_label.csv')).values[:, 1:]
         print("test:", self.test.shape)
         print("train:", self.train.shape)
@@ -435,6 +442,35 @@ class PSMSegLoader(Dataset):
             return np.float32(self.test[
                               index // self.step * self.win_size:index // self.step * self.win_size + self.win_size]), np.float32(
                 self.test_labels[index // self.step * self.win_size:index // self.step * self.win_size + self.win_size])
+        
+    # ---------- chronos2: read-only views ----------
+    @property
+    def data_x(self):
+        """(T, C) matrix for the current split; read-only view used by Exp_Chronos2."""
+        if self.flag == "train":
+            return self.train
+        elif self.flag == "val":
+            return self.val
+        elif self.flag == "test":
+            return self.test
+        else:
+            # keep a sensible fallback; treat unknown as test
+            return self.test
+
+    @property
+    def raw_dates(self):
+        """Pandas datetime index aligned with data_x length."""
+        if self.flag == "train":
+            return self._raw_dates_train
+        elif self.flag == "val":
+            return self._raw_dates_val
+        elif self.flag == "test":
+            return self._raw_dates_test
+        else:
+            return self._raw_dates_test
+
+    def inverse_transform(self, data):
+        return self.scaler.inverse_transform(data)
 
 
 class MSLSegLoader(Dataset):

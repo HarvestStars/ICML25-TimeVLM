@@ -22,7 +22,8 @@ NUM_TS_SAMPLES = 200  # Number of samples for time series datasets (increased fr
 NUM_COCO_SAMPLES = 400  # Number of samples for COCO dataset (increased from 200)
             
 # Set global font to Times New Roman
-plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman', 'DejaVu Serif', 'STIXGeneral']
 plt.rcParams['font.size'] = 14  # Set global font size
 
 

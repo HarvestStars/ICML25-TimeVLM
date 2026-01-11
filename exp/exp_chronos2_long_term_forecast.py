@@ -81,20 +81,84 @@ class Exp_Chronos2_Forecast(Exp_Basic):
         freq_map = {"h": "H", "t": "T", "min": "T", "m": "T", "d": "D"}
         return freq_map.get(str(freq).lower(), freq)
 
+    # def _get_split_timestamps(self, ds):
+    #     """
+    #     Prefer real timestamps if dataset exposes them; otherwise fabricate a date_range.
+    #     Recommended minimal change in VLM Dataset.__read_data__:
+    #         self.raw_dates = pd.to_datetime(df_raw['date'][border1:border2]).reset_index(drop=True)
+    #     """
+    #     if hasattr(ds, "raw_dates") and ds.raw_dates is not None:
+    #         # ensure pandas datetime series
+    #         print("Using real timestamps from dataset.raw_dates")
+    #         return pd.to_datetime(ds.raw_dates).reset_index(drop=True)
+
+    #     # fallback: fabricate timestamps (good enough to pass df_utils validation)
+    #     T = len(ds.data_x)
+    #     pd_freq = self._infer_pd_freq()
+    #     return pd.date_range("2000-01-01", periods=T, freq=pd_freq)
     def _get_split_timestamps(self, ds):
         """
         Prefer real timestamps if dataset exposes them; otherwise fabricate a date_range.
-        Recommended minimal change in VLM Dataset.__read_data__:
-            self.raw_dates = pd.to_datetime(df_raw['date'][border1:border2]).reset_index(drop=True)
-        """
-        if hasattr(ds, "raw_dates") and ds.raw_dates is not None:
-            # ensure pandas datetime series
-            return pd.to_datetime(ds.raw_dates).reset_index(drop=True)
 
-        # fallback: fabricate timestamps (good enough to pass df_utils validation)
+        VLM-side robustness policy (your requested version):
+        - Do NOT sort / do NOT de-duplicate / do NOT try to "fix" raw_dates.
+        - If raw_dates looks problematic for pd.infer_freq (duplicate / non-monotonic / infer fails),
+        then fallback to a fully fabricated regular date_range of length T.
+        - Always return length == T.
+        """
         T = len(ds.data_x)
         pd_freq = self._infer_pd_freq()
-        return pd.date_range("2000-01-01", periods=T, freq=pd_freq)
+
+        def _fabricate():
+            return pd.date_range("2000-01-01", periods=T, freq=pd_freq)
+
+        # No raw_dates -> fabricate
+        if not (hasattr(ds, "raw_dates") and ds.raw_dates is not None):
+            return _fabricate()
+
+        print("Using real timestamps from dataset.raw_dates")
+        ts = pd.to_datetime(ds.raw_dates)
+
+        # Basic sanity: must align length with data_x
+        if len(ts) != T:
+            print(f"[WARN] raw_dates length mismatch: len(raw_dates)={len(ts)} vs T={T}. Fallback to date_range.")
+            return _fabricate()
+
+        # Keep original order and length; just detect "danger" signals.
+        # 1) duplicates in raw order -> infer_freq likely fails
+        try:
+            has_dup = pd.Series(ts).duplicated().any()
+        except Exception:
+            has_dup = True
+
+        if has_dup:
+            print("[WARN] raw_dates has duplicates in original order. Fallback to date_range.")
+            return _fabricate()
+
+        # 2) non-monotonic in raw order -> infer_freq likely fails (we refuse to sort)
+        try:
+            idx = pd.DatetimeIndex(ts)
+            if not idx.is_monotonic_increasing:
+                print("[WARN] raw_dates is not monotonic increasing (we do not sort). Fallback to date_range.")
+                return _fabricate()
+        except Exception as e:
+            print(f"[WARN] DatetimeIndex conversion failed ({type(e).__name__}: {e}). Fallback to date_range.")
+            return _fabricate()
+
+        # 3) final check: infer_freq must succeed; otherwise fallback
+        inferred = None
+        try:
+            inferred = pd.infer_freq(pd.DatetimeIndex(ts))
+        except Exception as e:
+            print(f"[WARN] pd.infer_freq failed ({type(e).__name__}: {e}). Fallback to date_range.")
+            return _fabricate()
+
+        if inferred is None:
+            print(f"[WARN] Could not infer frequency from raw_dates. Fallback to date_range(freq={pd_freq}).")
+            return _fabricate()
+
+        # Good: return as Series aligned with T, keep original order
+        return pd.Series(ts).reset_index(drop=True)
 
     def _build_context_df_from_split(self, ds, id_column="item_id", timestamp_column="date_id"):
         """
@@ -204,6 +268,10 @@ class Exp_Chronos2_Forecast(Exp_Basic):
         train_df, target_cols = self._build_context_df_from_split(train_data, id_column="item_id", timestamp_column="date_id")
         val_df, _ = self._build_context_df_from_split(val_data, id_column="item_id", timestamp_column="date_id")
 
+        # print head 10 for sanity check
+        print("Train df head 10:\n", train_df.head(10))
+        print("Val df head 10:\n", val_df.head(10))
+        
         # Convert to list[dict] inputs as Chronos2 demo
         ft_inputs, _, _ = convert_df_input_to_list_of_dicts_input(
             df=train_df,
@@ -345,11 +413,11 @@ class Exp_Chronos2_Forecast(Exp_Basic):
                 preds_list.append(pred_batch)
                 trues_list.append(true_batch)
 
-                # --- visual (align with VLM's i%20==0) ---
-                if batch_idx % 20 == 0:
-                    gt = np.concatenate((ctx_vis[0, :, -1], true_batch[0, :, -1]), axis=0)
-                    pd_ = np.concatenate((ctx_vis[0, :, -1], pred_batch[0, :, -1]), axis=0)
-                    visual(gt, pd_, os.path.join(test_vis_folder, str(batch_idx) + ".pdf"))
+                # # --- visual (align with VLM's i%20==0) ---
+                # if batch_idx % 20 == 0:
+                #     gt = np.concatenate((ctx_vis[0, :, -1], true_batch[0, :, -1]), axis=0)
+                #     pd_ = np.concatenate((ctx_vis[0, :, -1], pred_batch[0, :, -1]), axis=0)
+                #     visual(gt, pd_, os.path.join(test_vis_folder, str(batch_idx) + ".pdf"))
 
                 start = end
                 batch_idx += 1
