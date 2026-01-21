@@ -1,5 +1,5 @@
 export TOKENIZERS_PARALLELISM=false
-model_name=chronos2
+model_name=TimeVLM
 vlm_type=clip
 gpu=0
 image_size=56
@@ -30,10 +30,10 @@ run_experiment() {
     local dropout=$8
 
     # Determine task name based on percent
-    local task_name="chronos2_long_term_forecast"
-    # if [ "$percent" = "1" ]; then
-    #     task_name="long_term_forecast"
-    # fi
+    local task_name="few_shot_forecast"
+    if [ "$percent" = "1" ]; then
+        task_name="long_term_forecast"
+    fi
 
     log_file="logs/${model_name}_${dset}_${seq_len}_${pred_len}_${percent}p.log"
     echo "Running experiment: dataset=${dset}, seq_len=${seq_len}, pred_len=${pred_len}, percent=${percent}"
@@ -74,9 +74,7 @@ run_experiment() {
       --vlm_type $vlm_type \
       --use_mem_gate $use_mem_gate \
       --dropout $dropout \
-      --percent $percent > $log_file \
-      --chronos2_model "amazon/chronos-2" \
-      --chronos2_dtype "bf16" 
+      --percent $percent > $log_file
 }
 
 # # ETTh1, n_vars=7, periodicity=24

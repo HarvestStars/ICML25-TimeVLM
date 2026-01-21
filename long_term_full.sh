@@ -18,4 +18,4 @@ source /projects/prjs1859/load_exp_env.sh
 which python
 python -c "import torch; print('torch ok', torch.__version__)"
 
-sh TimeVLM_long_1.0p.sh
+sh TimeVLM_long_1.0p_chronos2.sh

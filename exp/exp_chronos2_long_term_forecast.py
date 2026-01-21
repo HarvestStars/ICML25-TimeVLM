@@ -96,6 +96,7 @@ class Exp_Chronos2_Forecast(Exp_Basic):
     #     T = len(ds.data_x)
     #     pd_freq = self._infer_pd_freq()
     #     return pd.date_range("2000-01-01", periods=T, freq=pd_freq)
+    
     def _get_split_timestamps(self, ds):
         """
         Prefer real timestamps if dataset exposes them; otherwise fabricate a date_range.
