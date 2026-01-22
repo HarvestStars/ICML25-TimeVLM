@@ -230,7 +230,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
             min_past = prediction_length
 
         train_dataset = Chronos2Dataset.convert_inputs(
-            inputs=inputs,
+            inputs=inputs, # when inputs is list of dicts, each dict(target, past_covariates, future_covariates) is one task, used to fulfill the self.tasks
             context_length=context_length,
             prediction_length=prediction_length,
             batch_size=batch_size,
@@ -314,6 +314,37 @@ class Chronos2Pipeline(BaseChronosPipeline):
 
         training_kwargs.update(extra_trainer_kwargs)
 
+        # ---- HPC/Slurm safety: ensure MASTER_ADDR is set for single-node Slurm jobs ----
+        if "SLURM_JOB_ID" in os.environ:
+            # Slurm uses different keys on different systems
+            def _get_int(*keys, default=1):
+                for k in keys:
+                    v = os.environ.get(k)
+                    if v is not None and str(v).strip() != "":
+                        try:
+                            return int(v)
+                        except ValueError:
+                            pass
+                return default
+
+            nnodes = _get_int("SLURM_NNODES", "SLURM_JOB_NUM_NODES", default=1)
+            # Step/task vars can be >1 even when you don't want DDP, so don't rely on them too hard
+            ntasks = _get_int("SLURM_NTASKS", "SLURM_STEP_NUM_TASKS", "SLURM_NPROCS", default=1)
+
+            # If it's a single-node allocation and MASTER_ADDR is missing, set a safe local default.
+            if nnodes <= 1 and "MASTER_ADDR" not in os.environ:
+                os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+                os.environ.setdefault("MASTER_PORT", os.environ.get("MASTER_PORT", "29500"))
+                # Keep these consistent for the common single-process case
+                os.environ.setdefault("WORLD_SIZE", "1")
+                os.environ.setdefault("RANK", "0")
+                os.environ.setdefault("LOCAL_RANK", "0")
+
+                # Also tell TrainingArguments we're not doing DDP
+                training_kwargs.setdefault("local_rank", -1)
+                training_kwargs.setdefault("ddp_backend", None)
+                training_kwargs.setdefault("ddp_find_unused_parameters", False)
+
         if training_kwargs["tf32"]:
             # setting tf32=True changes these global properties, we copy them here so that
             # we can restore them after fine-tuning
@@ -321,6 +352,14 @@ class Chronos2Pipeline(BaseChronosPipeline):
             cudnn_tf32 = torch.backends.cudnn.allow_tf32
 
         training_args = TrainingArguments(**training_kwargs)
+
+        print("DEBUG(after patch) MASTER_ADDR =", os.environ.get("MASTER_ADDR"))
+        print("DEBUG(after patch) WORLD_SIZE =", os.environ.get("WORLD_SIZE"))
+        print("DEBUG(after patch) RANK =", os.environ.get("RANK"))
+        print("DEBUG(after patch) LOCAL_RANK =", os.environ.get("LOCAL_RANK"))
+        print("DEBUG(after patch) SLURM_NNODES =", os.environ.get("SLURM_NNODES"))
+        print("DEBUG(after patch) SLURM_NTASKS =", os.environ.get("SLURM_NTASKS"))
+        print("DEBUG(after patch) SLURM_STEP_NUM_TASKS =", os.environ.get("SLURM_STEP_NUM_TASKS"))
 
         if disable_data_parallel and not use_cpu:
             # This is a hack to disable the default `transformers` behavior of using DataParallel
@@ -415,8 +454,8 @@ class Chronos2Pipeline(BaseChronosPipeline):
             original_values=rearrange(prediction, "b q h -> b h q"),
         )
         prediction_unrolled = rearrange(prediction_unrolled, "b h q -> b q h")
-        context = torch.cat([context, prediction_unrolled], dim=-1)[..., -self.model_context_length :]
-        n_paths = len(unrolled_quantiles)
+        context = torch.cat([context, prediction_unrolled], dim=-1)[..., -self.model_context_length :] # original context shape [b q t]
+        n_paths = len(unrolled_quantiles) # q
 
         # Shift future_covariates by prediction.shape[-1] while replacing the predicted values
         # of future covariates in the context with their actual values, if known
@@ -556,6 +595,8 @@ class Chronos2Pipeline(BaseChronosPipeline):
         The model's predictions, a list of `torch.Tensor` where each element has shape (n_variates, n_quantiles, prediction_length) and the number of
         elements are equal to the number of target time series (univariate or multivariate) in the `inputs`.
 
+        Each 'element' corresponds to each 'task' in <inputs> in the same order.
+
         """
         model_prediction_length = self.model_prediction_length
         if prediction_length is None:
@@ -623,7 +664,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
         )
 
         all_predictions: list[torch.Tensor] = []
-        for batch in test_loader:
+        for batch in test_loader: # for example, we have 10 tasks, and 5 tasks combine a batch, then we have 2 batches, then the batch_index is "1" for (1~5 tasks), "2" for (6~10 tasks)
             assert batch["future_target"] is None
             batch_context = batch["context"]
             batch_group_ids = batch["group_ids"]
@@ -633,7 +674,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
             if cross_learning:
                 batch_group_ids = torch.zeros_like(batch_group_ids)
 
-            batch_prediction = self._predict_batch(
+            batch_prediction = self._predict_batch( # list of (target_variates_per_task, q, h)
                 context=batch_context,
                 group_ids=batch_group_ids,
                 future_covariates=batch_future_covariates,
@@ -642,7 +683,15 @@ class Chronos2Pipeline(BaseChronosPipeline):
                 max_output_patches=max_output_patches,
                 target_idx_ranges=batch_target_idx_ranges,
             )
-            all_predictions.extend(batch_prediction)
+            # batch_prediction: List[Tensor], length == number_of_tasks_in_this_dataloader_batch
+            # each element corresponds to one task (one input series dict / one row in ctx_inputs batch)
+            # and has shape: (target_variates_per_task, n_quantiles, prediction_length)
+
+            # all_predictions: List[Tensor], length == number_of_tasks_in_all_inputs (after iterating all dataloader batches)
+            # each element shape: (target_variates_per_task, n_quantiles(q), prediction_length(h))
+            all_predictions.extend(batch_prediction) # list of (target_variates_per_task, q, h), which shape is (task_index(batch_index), target_variates_per_task, n_quantiles, prediction_length)
+
+            # newly added callback after each batch is processed
             after_batch_callback()
 
         return all_predictions
@@ -671,13 +720,13 @@ class Chronos2Pipeline(BaseChronosPipeline):
         remaining = prediction_length
 
         # predict first set of patches up to max_output_patches
-        prediction: torch.Tensor = self._predict_step(
-            context=context,
+        prediction: torch.Tensor = self._predict_step( # handle the batch-wise prediction
+            context=context, # this batch context
             group_ids=group_ids,
             future_covariates=future_covariates,
             num_output_patches=get_num_output_patches(remaining),
         )
-        predictions.append(prediction)
+        predictions.append(prediction) # (b,q,h) --> list of (b,q,h)
         remaining -= prediction.shape[-1]
 
         # prepare inputs for long horizon prediction
@@ -705,11 +754,11 @@ class Chronos2Pipeline(BaseChronosPipeline):
             predictions.append(prediction)
             remaining -= prediction.shape[-1]
 
-        batch_prediction = torch.cat(predictions, dim=-1)[..., :prediction_length].to(
+        batch_prediction = torch.cat(predictions, dim=-1)[..., :prediction_length].to( # list of (b,q,h) --> (b,q,h)
             dtype=torch.float32, device="cpu"
         )
 
-        return [batch_prediction[start:end] for (start, end) in target_idx_ranges]
+        return [batch_prediction[start:end] for (start, end) in target_idx_ranges] # list of (targetTS_per_task,q,h) --> (task_number, targetTS_per_task, q, h)
 
     def _predict_step(
         self,
@@ -736,7 +785,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
         with torch.no_grad():
             prediction: torch.Tensor = self.model(
                 context=context, group_ids=group_ids, num_output_patches=num_output_patches, **kwargs
-            ).quantile_preds.to(context)
+            ).quantile_preds.to(context) # (batch_size, n_quantiles, length)
 
         return prediction
 
@@ -782,15 +831,15 @@ class Chronos2Pipeline(BaseChronosPipeline):
         """
         training_quantile_levels = self.quantiles
 
-        predictions: list[torch.Tensor] = self.predict(inputs, prediction_length=prediction_length, **predict_kwargs)
+        predictions: list[torch.Tensor] = self.predict(inputs, prediction_length=prediction_length, **predict_kwargs) # (task_index(batch_index), target_variates_per_task, n_quantiles, prediction_length)
 
         # Swap quantile and time axes for each prediction
-        predictions = [rearrange(pred, "... q h -> ... h q") for pred in predictions]
+        predictions = [rearrange(pred, "... q h -> ... h q") for pred in predictions] # original pred shape (batch_index(like index 1: task 1~5, index 2: task 6~10), batch_size(n_variates), n_quantiles, prediction_length) denote as (b_indx, b_size, q, h) then transform -> (b_indx, b_size, h(pred_len), q)
 
         if set(quantile_levels).issubset(training_quantile_levels):
             # no need to perform intra/extrapolation
             quantile_indices = [training_quantile_levels.index(q) for q in quantile_levels]
-            quantiles = [pred[..., quantile_indices] for pred in predictions]
+            quantiles = [pred[..., quantile_indices] for pred in predictions] # each pred is a task-wise prediction, shape (target_variates_per_task, prediction_length, n_quantiles)
         else:
             # we interpolate quantiles if quantiles that Chronos-2 was trained on were not provided
             if min(quantile_levels) < min(training_quantile_levels) or max(quantile_levels) > max(
@@ -808,7 +857,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
             ]
 
         # NOTE: the median is returned as the mean here
-        mean = [pred[..., training_quantile_levels.index(0.5)] for pred in predictions]
+        mean = [pred[..., training_quantile_levels.index(0.5)] for pred in predictions] # predictions: (task_index(batch_index), target_indx_inner, h, q) --> mean: (task_index(batch_index), target_indx_inner, h)
 
         return quantiles, mean
 
@@ -816,7 +865,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
         self,
         df: "pd.DataFrame",
         future_df: "pd.DataFrame | None" = None,
-        id_column: str = "item_id",
+        id_column: str = "item_id", # task(input dict element) identifier
         timestamp_column: str = "timestamp",
         target: str | list[str] = "target",
         prediction_length: int | None = None,
@@ -896,6 +945,7 @@ class Chronos2Pipeline(BaseChronosPipeline):
         if not isinstance(target, list):
             target = [target]
 
+        # Convert DataFrame input to the "inputs" ( also known as "tasks", also the list of dicts(tasks) )
         inputs, original_order, prediction_timestamps = convert_df_input_to_list_of_dicts_input(
             df=df,
             future_df=future_df,

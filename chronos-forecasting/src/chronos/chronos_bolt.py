@@ -308,7 +308,7 @@ class ChronosBoltModelForForecasting(T5PreTrainedModel):
             self.num_quantiles,
             self.chronos_config.prediction_length,
         )
-        quantile_preds = self.output_patch_embedding(sequence_output).view(*quantile_preds_shape)
+        quantile_preds = self.output_patch_embedding(sequence_output).view(*quantile_preds_shape) # shape: (batch_size(b), num_quantiles(q), prediction_length(n*p))
 
         loss = None
         if target is not None:
