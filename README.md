@@ -24,6 +24,20 @@ Time-VLM provides an extensible framework for integrating various Vision-Languag
 
 ## 🚀 Quick Start
 
+### Chronos2 Setup
+To set up the environment, we use the editable installing
+```bash
+cd ./chronos-forecasting
+pip install -e .
+```
+
+#### Note on scikit-learn version requirement
+Chronos2 enforces an upgrade of scikit-learn to version 1.7.2 during installation.
+This conflicts with the original Time-VLM dependency constraint (scikit-learn < 1.3.0).
+
+In this project, the Time-VLM components that explicitly depend on the legacy scikit-learn version are not used and have been commented out, as the corresponding dataset-related experiments are outside the scope of this study.
+Therefore, upgrading scikit-learn to 1.7.2 is safe and required for Chronos2 compatibility.
+
 ### Environment Setup
 
 To set up the environment, install Python 3.8 with Pytorch 1.4.4. Use the following commands for convenience:
@@ -40,7 +54,7 @@ Download the pre-processed datasets from:
 - **Google Drive**: [Download Link](https://drive.google.com/drive/folders/13Cg1KYOlzM5C7K8gK8NfC-F3EYxkM3D2?usp=sharing)
 - **Baidu Drive**: [Download Link](https://pan.baidu.com/s/1r3KhGd0Q9PJIUZdfEYoymg?pwd=i9iy)
 
-Place the downloaded data in the `./dataset` folder.
+Place the downloaded data in the `./dataset` folder, with the first letter UPPERCASE. like: `Electricity.csv`
 
 ### Running Experiments
 
