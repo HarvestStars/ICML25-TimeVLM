@@ -53,6 +53,7 @@ pip install -r requirements.txt
 Download the pre-processed datasets from:
 - **Google Drive**: [Download Link](https://drive.google.com/drive/folders/13Cg1KYOlzM5C7K8gK8NfC-F3EYxkM3D2?usp=sharing)
 - **Baidu Drive**: [Download Link](https://pan.baidu.com/s/1r3KhGd0Q9PJIUZdfEYoymg?pwd=i9iy)
+- **Crypto Kline Data**: [Download Link](https://drive.google.com/file/d/11J7LR7qp3cVVwsJgQmsWuiw3Tge-QVFV/view?usp=drive_link)
 
 Place the downloaded data in the `./dataset` folder, with the first letter UPPERCASE. like: `Electricity.csv`
 
