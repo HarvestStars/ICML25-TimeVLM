@@ -40,14 +40,16 @@ run_experiment() {
 
     python -u run.py \
       --task_name $task_name \
-      --is_training 0 \
-      --is_zeroshot 1 \
+      --is_training 1 \
+      --is_zeroshot 0 \
       --root_path ./dataset/ \
       --data_path ${dset}.csv \
       --model_id ${dset}_${seq_len}_${pred_len} \
       --model $model_name \
       --data ${data} \
       --features M \
+      --target high low open close volume \
+      --freq 15T \
       --seq_len $seq_len \
       --label_len 48 \
       --pred_len $pred_len \
@@ -79,6 +81,12 @@ run_experiment() {
       --chronos2_dtype "bf16" 
 }
 
+# Crypto, n_vars=21, periodicity=144
+run_experiment BTCUSDT_15m_Binance crypto 21 96 64 True 144 0.1
+run_experiment BTCUSDT_15m_Binance crypto 21 192 64 True 144 0.1
+run_experiment BTCUSDT_15m_Binance crypto 21 336 128 True 144 0.1
+run_experiment BTCUSDT_15m_Binance crypto 21 720 64 True 144 0.1
+
 # # ETTh1, n_vars=7, periodicity=24
 # run_experiment ETTh1 ETTh1 7 96 32 False 24 0.1
 # run_experiment ETTh1 ETTh1 7 192 32 False 24 0.1
@@ -103,20 +111,20 @@ run_experiment() {
 # run_experiment ETTm2 ETTm2 7 336 32 True 96 0.2
 # run_experiment ETTm2 ETTm2 7 720 32 True 96 0.2
 
-# Electricity, n_vars=321, periodicity=24
-run_experiment Electricity custom 321 96 128 True 24 0.1
-run_experiment Electricity custom 321 192 128 True 24 0.1
-run_experiment Electricity custom 321 336 256 True 24 0.1
-run_experiment Electricity custom 321 720 64 True 24 0.1
+# # Electricity, n_vars=321, periodicity=24
+# run_experiment Electricity custom 321 96 128 True 24 0.1
+# run_experiment Electricity custom 321 192 128 True 24 0.1
+# run_experiment Electricity custom 321 336 256 True 24 0.1
+# run_experiment Electricity custom 321 720 64 True 24 0.1
 
-# Traffic, n_vars=862, periodicity=24
-run_experiment Traffic custom 862 96 128 True 24 0.1
-run_experiment Traffic custom 862 192 128 True 24 0.1
-run_experiment Traffic custom 862 336 256 True 24 0.1
-run_experiment Traffic custom 862 720 512 True 24 0.1
+# # Traffic, n_vars=862, periodicity=24
+# run_experiment Traffic custom 862 96 128 True 24 0.1
+# run_experiment Traffic custom 862 192 128 True 24 0.1
+# run_experiment Traffic custom 862 336 256 True 24 0.1
+# run_experiment Traffic custom 862 720 512 True 24 0.1
 
-# Weather, n_vars=21, periodicity=144
-run_experiment Weather custom 21 96 64 True 144 0.1
-run_experiment Weather custom 21 192 64 True 144 0.1
-run_experiment Weather custom 21 336 128 True 144 0.1
-run_experiment Weather custom 21 720 64 True 144 0.1
+# # Weather, n_vars=21, periodicity=144
+# run_experiment Weather custom 21 96 64 True 144 0.1
+# run_experiment Weather custom 21 192 64 True 144 0.1
+# run_experiment Weather custom 21 336 128 True 144 0.1
+# run_experiment Weather custom 21 720 64 True 144 0.1
