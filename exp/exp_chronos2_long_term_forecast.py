@@ -118,17 +118,26 @@ class Exp_Chronos2_Forecast(Exp_Basic):
             return _fabricate()
 
         print("Using real timestamps from dataset.raw_dates")
-        ts = pd.to_datetime(ds.raw_dates)
 
+        # Ensure pandas datetime series; keep original order and length for now (we will check them later).
+        ts = pd.to_datetime(ds.raw_dates, utc=True)
+        try:
+            ts_naive = ts.dt.tz_convert(None) # Series[datetime64[ns, UTC]] --> Series[datetime64[ns]] (tz-naive)
+        except Exception:
+            ts_naive = ts  # if conversion fails, keep as is and let later checks catch potential issues
+
+        print(f"ts length is {len(ts_naive)}, while T is {T}. We require len(ts) == T to use raw_dates; otherwise fallback to date_range.")
+        print(f"First 5 timestamps: \n {ts_naive[:5]}")
+        
         # Basic sanity: must align length with data_x
-        if len(ts) != T:
-            print(f"[WARN] raw_dates length mismatch: len(raw_dates)={len(ts)} vs T={T}. Fallback to date_range.")
+        if len(ts_naive) != T:
+            print(f"[WARN] raw_dates length mismatch: len(raw_dates)={len(ts_naive)} vs T={T}. Fallback to date_range.")
             return _fabricate()
 
         # Keep original order and length; just detect "danger" signals.
         # 1) duplicates in raw order -> infer_freq likely fails
         try:
-            has_dup = pd.Series(ts).duplicated().any()
+            has_dup = pd.Series(ts_naive).duplicated().any()
         except Exception:
             has_dup = True
 
@@ -136,10 +145,10 @@ class Exp_Chronos2_Forecast(Exp_Basic):
             print("[WARN] raw_dates has duplicates in original order. Fallback to date_range.")
             return _fabricate()
 
-        # 2) non-monotonic in raw order -> infer_freq likely fails (we refuse to sort)
+        # 2) non-monotonic in raw order (we refuse to sort)
         try:
-            idx = pd.DatetimeIndex(ts)
-            if not idx.is_monotonic_increasing:
+            idx_naive = pd.DatetimeIndex(ts_naive)
+            if not idx_naive.is_monotonic_increasing:
                 print("[WARN] raw_dates is not monotonic increasing (we do not sort). Fallback to date_range.")
                 return _fabricate()
         except Exception as e:
@@ -147,9 +156,8 @@ class Exp_Chronos2_Forecast(Exp_Basic):
             return _fabricate()
 
         # 3) final check: infer_freq must succeed; otherwise fallback
-        inferred = None
         try:
-            inferred = pd.infer_freq(pd.DatetimeIndex(ts))
+            inferred = pd.infer_freq(idx_naive)  # use original order for inference, even if it's "dangerous", to respect user's data as much as possible; if it fails, we will catch and fallback
         except Exception as e:
             print(f"[WARN] pd.infer_freq failed ({type(e).__name__}: {e}). Fallback to date_range.")
             return _fabricate()
@@ -158,8 +166,9 @@ class Exp_Chronos2_Forecast(Exp_Basic):
             print(f"[WARN] Could not infer frequency from raw_dates. Fallback to date_range(freq={pd_freq}).")
             return _fabricate()
 
-        # Good: return as Series aligned with T, keep original order
-        return pd.Series(ts).reset_index(drop=True)
+        # avoid time-zone-aware timestamps which may cause issues in Chronos2; if tz-aware, convert to naive (local) time
+        return pd.Series(ts_naive).reset_index(drop=True)
+
 
     def _build_context_df_from_split(self, ds, id_column="item_id", timestamp_column="date_id"):
         """
@@ -414,11 +423,11 @@ class Exp_Chronos2_Forecast(Exp_Basic):
                 preds_list.append(pred_batch)
                 trues_list.append(true_batch)
 
-                # # --- visual (align with VLM's i%20==0) ---
-                # if batch_idx % 20 == 0:
-                #     gt = np.concatenate((ctx_vis[0, :, -1], true_batch[0, :, -1]), axis=0)
-                #     pd_ = np.concatenate((ctx_vis[0, :, -1], pred_batch[0, :, -1]), axis=0)
-                #     visual(gt, pd_, os.path.join(test_vis_folder, str(batch_idx) + ".pdf"))
+                # --- visual (align with VLM's i%20==0) ---
+                if batch_idx % 20 == 0:
+                    gt = np.concatenate((ctx_vis[0, :, -1], true_batch[0, :, -1]), axis=0)
+                    pd_ = np.concatenate((ctx_vis[0, :, -1], pred_batch[0, :, -1]), axis=0)
+                    visual(gt, pd_, os.path.join(test_vis_folder, str(batch_idx) + ".pdf"))
 
                 start = end
                 batch_idx += 1

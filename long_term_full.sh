@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH -p gpu_h100
 #SBATCH --gpus=1
-#SBATCH --cpus-per-gpu=32
-#SBATCH --mem-per-gpu=256G
+#SBATCH --cpus-per-gpu=16
+#SBATCH --mem-per-gpu=64G
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH -t 24:00:00

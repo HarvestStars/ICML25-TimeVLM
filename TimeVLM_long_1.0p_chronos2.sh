@@ -48,8 +48,9 @@ run_experiment() {
       --model $model_name \
       --data ${data} \
       --features M \
-      --target high low open close volume \
-      --freq 15T \
+      --target volume high low open close \
+      --freq 4h \
+      --scale False \
       --seq_len $seq_len \
       --label_len 48 \
       --pred_len $pred_len \
@@ -82,10 +83,10 @@ run_experiment() {
 }
 
 # Crypto, n_vars=21, periodicity=144
-run_experiment BTCUSDT_15m_Binance crypto 21 96 64 True 144 0.1
-run_experiment BTCUSDT_15m_Binance crypto 21 192 64 True 144 0.1
-run_experiment BTCUSDT_15m_Binance crypto 21 336 128 True 144 0.1
-run_experiment BTCUSDT_15m_Binance crypto 21 720 64 True 144 0.1
+run_experiment BTCUSDT_4h_Binance crypto 21 96 64 True 144 0.1
+run_experiment BTCUSDT_4h_Binance crypto 21 192 64 True 144 0.1
+run_experiment BTCUSDT_4h_Binance crypto 21 336 128 True 144 0.1
+run_experiment BTCUSDT_4h_Binance crypto 21 720 64 True 144 0.1
 
 # # ETTh1, n_vars=7, periodicity=24
 # run_experiment ETTh1 ETTh1 7 96 32 False 24 0.1

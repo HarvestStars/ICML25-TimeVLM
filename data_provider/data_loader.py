@@ -349,15 +349,15 @@ class Dataset_Crypto(Dataset):
                                           self.data_path))
 
         '''
-        df_raw.columns: ['eventtime', targets...]
+        df_raw.columns: ['starttime', targets...]
         '''
         cols = list(df_raw.columns)
         # remove all targets
         for target in self.targets:
             cols.remove(target)
         
-        cols.remove('eventtime')
-        df_raw = df_raw[['eventtime'] + self.targets]
+        cols.remove('starttime')
+        df_raw = df_raw[['starttime'] + self.targets]
         num_train = int(len(df_raw) * 0.7)
         num_test = int(len(df_raw) * 0.2)
         num_vali = len(df_raw) - num_train - num_test
@@ -379,23 +379,23 @@ class Dataset_Crypto(Dataset):
         else:
             data = df_data.values
 
-        dt = pd.to_datetime(df_raw['eventtime'][border1:border2], unit='ms', utc=True)
-        df_stamp = dt.to_frame(name='eventtime')
+        dt = pd.to_datetime(df_raw['starttime'][border1:border2], unit='ms', utc=True)
+        df_stamp = dt.to_frame(name='starttime')
         self.raw_dates = dt.reset_index(drop=True)
 
-        # df_stamp = df_raw[['eventtime']][border1:border2]
-        # df_stamp['eventtime'] = pd.to_datetime(df_stamp['eventtime'], unit='ms', utc=True)
-        # self.raw_dates = pd.to_datetime(df_raw['eventtime'][border1:border2], unit='ms', utc=True).reset_index(drop=True)
+        # df_stamp = df_raw[['starttime']][border1:border2]
+        # df_stamp['starttime'] = pd.to_datetime(df_stamp['starttime'], unit='ms', utc=True)
+        # self.raw_dates = pd.to_datetime(df_raw['starttime'][border1:border2], unit='ms', utc=True).reset_index(drop=True)
 
         if self.timeenc == 0:
-            df_stamp['month'] = df_stamp.eventtime.apply(lambda row: row.month, 1)
-            df_stamp['day'] = df_stamp.eventtime.apply(lambda row: row.day, 1)
-            df_stamp['weekday'] = df_stamp.eventtime.apply(lambda row: row.weekday(), 1)
-            df_stamp['hour'] = df_stamp.eventtime.apply(lambda row: row.hour, 1)
-            data_stamp = df_stamp.drop(['eventtime'], 1).values
+            df_stamp['month'] = df_stamp.starttime.apply(lambda row: row.month, 1)
+            df_stamp['day'] = df_stamp.starttime.apply(lambda row: row.day, 1)
+            df_stamp['weekday'] = df_stamp.starttime.apply(lambda row: row.weekday(), 1)
+            df_stamp['hour'] = df_stamp.starttime.apply(lambda row: row.hour, 1)
+            data_stamp = df_stamp.drop(['starttime'], 1).values
         elif self.timeenc == 1:
             data_stamp = time_features(dt.values, freq=self.freq).transpose(1, 0)
-            # data_stamp = time_features(pd.to_datetime(df_stamp['eventtime'].values), freq=self.freq)
+            # data_stamp = time_features(pd.to_datetime(df_stamp['starttime'].values), freq=self.freq)
             # data_stamp = data_stamp.transpose(1, 0)
 
         self.data_x = data[border1:border2]

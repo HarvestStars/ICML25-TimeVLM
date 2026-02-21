@@ -1,4 +1,4 @@
-from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom,Dataset_Crypto, Dataset_M4, PSMSegLoader, \
+from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Crypto, Dataset_M4, PSMSegLoader, \
     MSLSegLoader, SMAPSegLoader, SMDSegLoader, SWATSegLoader, UEAloader
 from data_provider.uea import collate_fn
 from torch.utils.data import DataLoader
@@ -75,6 +75,7 @@ def data_provider(args, flag):
             target=args.target,
             timeenc=timeenc,
             freq=freq,
+            scale=args.scale,
             seasonal_patterns=args.seasonal_patterns
         )
         if args.percent < 1. and flag == 'train':
